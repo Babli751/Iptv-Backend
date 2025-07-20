@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Boolean, Column, Integer, String, Text  # Gerekli tipleri import edin
 from app.db.base import Base
 
 class Channel(Base):
