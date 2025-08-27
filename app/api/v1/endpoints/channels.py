@@ -53,8 +53,8 @@ def get_static_m3u_playlist():
     # A list of static channels. You can add more channels to this list.
     static_channels = [
         {
-            "name": "4tv News",
-            "url": "http://51.254.122.232:5005/stream/tata/4tvnews/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
+            "name": "&pictures",
+            "url": "http://51.254.122.232:5005/stream/tata/pictures/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
             "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
             "group": "News"
         },
@@ -65,32 +65,32 @@ def get_static_m3u_playlist():
             "group": "News"
         },
         {
-            "name": "9X Jalwa",
-            "url": "http://51.254.122.232:5005/stream/tata/9xjalwa/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
+            "name": "&TV",
+            "url": "http://51.254.122.232:5005/stream/tata/tv/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
             "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
             "group": "News"
         },
         {
-            "name": "AB STAR News",
-            "url": "http://51.254.122.232:5005/stream/tata/abstarnews/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
+            "name": "Animal Planet HD World",
+            "url": "http://51.254.122.232:5005/stream/tata/animalplanethdworld/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
             "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
             "group": "News"
         },
         {
-            "name": "ABC News",
-            "url": "http://51.254.122.232:5005/stream/tata/abcnews/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
+            "name": "Jantantra TV",
+            "url": "http://51.254.122.232:5005/stream/tata/jantantratv/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
             "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
             "group": "News"
         },
         {
-            "name": "ABP Asmita",
-            "url": "http://51.254.122.232:5005/stream/tata/abpasmita/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
+            "name": "Jaya Max",
+            "url": "http://51.254.122.232:5005/stream/tata/jayamax/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
             "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
             "group": "News"
         },
         {
-            "name": "Action Cinema",
-            "url": "http://51.254.122.232:5005/stream/tata/actioncinema/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
+            "name": "Bollywood Premiere",
+            "url": "http://51.254.122.232:5005/stream/tata/tataplaybollywoodpremiere/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
             "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
             "group": "News"
         },
