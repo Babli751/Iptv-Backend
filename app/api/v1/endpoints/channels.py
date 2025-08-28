@@ -1,7 +1,8 @@
-import subprocess
 import os
+import subprocess
 import asyncio
-from fastapi import APIRouter, Depends, BackgroundTasks
+import time
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -89,13 +90,26 @@ HLS_OUTPUT_DIR = "hls_streams"
 if not os.path.exists(HLS_OUTPUT_DIR):
     os.makedirs(HLS_OUTPUT_DIR)
 
-# Mount the HLS output directory to be served as static files
-# The new HLS links will point to this URL path.
-# Change the /api/v1/channels/hls to match your API structure
-router.mount("/hls", StaticFiles(directory=HLS_OUTPUT_DIR), name="hls_files")
-
 # Dictionary to keep track of active FFmpeg processes
 active_streams = {}
+
+def get_channel_by_name(channel_name: str):
+    """
+    Helper function to get a channel from the static list by name.
+    """
+    for channel in static_channels:
+        if channel["re_stream_id"] == channel_name:
+            return channel
+    return None
+
+def stop_ffmpeg_process(stream_id: str):
+    """
+    Stops the FFmpeg process for a given stream.
+    """
+    if stream_id in active_streams:
+        process = active_streams.pop(stream_id)
+        process.terminate()
+        print(f"Stopped FFmpeg process for '{stream_id}'.")
 
 async def run_ffmpeg_process(stream_id: str, source_url: str):
     """
@@ -113,11 +127,11 @@ async def run_ffmpeg_process(stream_id: str, source_url: str):
     command = [
         'ffmpeg',
         '-i', source_url,  # Input stream URL
-        '-c:v', 'copy',     # Copy video codec without re-encoding
-        '-c:a', 'copy',     # Copy audio codec without re-encoding
+        '-c:v', 'copy',      # Copy video codec without re-encoding
+        '-c:a', 'copy',      # Copy audio codec without re-encoding
         '-hls_time', '2',  # Duration of each HLS segment
         '-hls_list_size', '5',  # Number of segments in the playlist
-        '-f', 'hls',        # Output format is HLS
+        '-f', 'hls',         # Output format is HLS
         os.path.join(output_dir, 'master.m3u8')  # Output M3U8 file path
     ]
 
@@ -127,21 +141,41 @@ async def run_ffmpeg_process(stream_id: str, source_url: str):
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         active_streams[stream_id] = process
         
-        # Keep the process alive. This is a simple approach.
-        # For production, you would use a more robust process manager.
-        await asyncio.sleep(600) # Keep running for 10 minutes, for example
-
     except FileNotFoundError:
         print("FFmpeg not found. Please ensure it is installed and in your system's PATH.")
     except Exception as e:
         print(f"An error occurred while starting the FFmpeg process for '{stream_id}': {e}")
-    finally:
-        # Cleanup when the task is done (optional)
-        if stream_id in active_streams:
-            active_streams[stream_id].terminate()
-            del active_streams[stream_id]
-            print(f"FFmpeg process for '{stream_id}' terminated.")
 
+
+@router.get("/hls/{channel_name}/master.m3u8")
+async def get_hls_stream(channel_name: str, background_tasks: BackgroundTasks):
+    """
+    Starts FFmpeg process for the requested channel and then serves the HLS master playlist file.
+    This endpoint now handles both starting the stream and serving the master.m3u8 file.
+    """
+    channel = get_channel_by_name(channel_name)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+        
+    stream_id = channel["re_stream_id"]
+    source_url = channel["url"]
+
+    # Start the FFmpeg process in the background
+    background_tasks.add_task(run_ffmpeg_process, stream_id, source_url)
+
+    # Wait for a brief moment to allow FFmpeg to start and create files
+    # This is to prevent a race condition where the player requests the file before it exists.
+    await asyncio.sleep(2)
+
+    # Now, try to serve the file from the correct static directory
+    file_path = os.path.join(HLS_OUTPUT_DIR, stream_id, "master.m3u8")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="HLS stream not available yet. Please try again in a few seconds.")
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    return Response(content=content, media_type="application/vnd.apple.mpegurl")
 
 @router.get("/static-hls-m3u")
 async def get_static_hls_playlist(background_tasks: BackgroundTasks):
@@ -150,23 +184,21 @@ async def get_static_hls_playlist(background_tasks: BackgroundTasks):
     """
     m3u_content = "#EXTM3U\n"
     
-    # You must replace this with your actual server's public IP or domain name.
-    # The port should match what your FastAPI server is running on (e.g., 8000)
     server_base_url = "http://5.63.19.76:8000"
 
     for channel in static_channels:
-        # Start the FFmpeg process for each channel in the background
+        # Ensure the FFmpeg process is started for each channel
+        # This is a better place to start the stream than the main API.
         background_tasks.add_task(run_ffmpeg_process, channel["re_stream_id"], channel["url"])
-
-        # Create the new HLS link that points to your server's mounted HLS folder
-        hls_url = f"{server_base_url}/api/v1/channels/hls/{quote(channel['re_stream_id'])}/master.m3u8"
         
-        m3u_content += f'#EXTINF:-1 tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
+        # Create the new HLS link that points to your server's mounted HLS folder
+        hls_url = f"{server_base_url}/hls_streams/{quote(channel['re_stream_id'])}/master.m3u8"
+        
+        m3u_content += f'#EXTINF:-1 tvg-name=\"{channel["name"]}\" tvg-logo=\"{channel["logo"]}\" group-title=\"{channel["group"]}\",{channel["name"]}\n'
         m3u_content += f'{hls_url}\n'
 
     # Return the playlist with the correct media type for players
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
-
 
 # Existing endpoint to get channels from the database
 @router.get("/", response_model=List[Channel])
@@ -196,7 +228,7 @@ def get_m3u_playlist(
     for channel in channels:
         if channel.is_premium and current_user.subscription_plan == "free":
             continue
-        m3u_content += f'#EXTINF:-1 tvg-id="{channel.id}" tvg-name="{channel.name}" tvg-logo="{channel.logo}" group-title="{channel.m3u_group}",{channel.name}\n'
+        m3u_content += f'#EXTINF:-1 tvg-id=\"{channel.id}\" tvg-name=\"{channel.name}\" tvg-logo=\"{channel.logo}\" group-title=\"{channel.m3u_group}\",{channel.name}\n'
         m3u_content += f"{channel.url}\n"
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
 
@@ -209,6 +241,6 @@ def get_static_m3u_playlist():
     """
     m3u_content = "#EXTM3U\n"
     for channel in static_channels:
-        m3u_content += f'#EXTINF:-1 tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
+        m3u_content += f'#EXTINF:-1 tvg-name=\"{channel["name"]}\" tvg-logo=\"{channel["logo"]}\" group-title=\"{channel["group"]}\",{channel["name"]}\n'
         m3u_content += f'{channel["url"]}\n'
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
