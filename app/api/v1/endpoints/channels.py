@@ -2,11 +2,14 @@ import os
 import subprocess
 import asyncio
 import time
+import threading
+import glob
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 from urllib.parse import quote
 
 # Assuming these imports are correct based on your project structure
@@ -93,6 +96,16 @@ if not os.path.exists(HLS_OUTPUT_DIR):
 # Dictionary to keep track of active FFmpeg processes
 FFMPEG_PROCESSES = {}
 
+# Dictionary to keep track of cleanup threads
+CLEANUP_THREADS = {}
+
+# Configuration for HLS streaming
+HLS_CONFIG = {
+    "segment_duration": 2,  # 2 seconds per segment
+    "max_segments": 5,      # Keep only 5 segments (10 seconds total)
+    "cleanup_interval": 5,  # Clean up every 5 seconds
+}
+
 def get_channel_by_name(channel_name: str):
     """
     Helper function to get a channel from the static list by name.
@@ -102,17 +115,60 @@ def get_channel_by_name(channel_name: str):
             return channel
     return None
 
+def cleanup_old_segments(channel_name: str):
+    """
+    Continuously cleans up old HLS segments, keeping only the last 10 seconds.
+    """
+    output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
+    
+    def cleanup_worker():
+        while channel_name in FFMPEG_PROCESSES:
+            try:
+                # Get all .ts files in the channel directory
+                segment_pattern = os.path.join(output_dir, "*.ts")
+                segments = glob.glob(segment_pattern)
+                
+                if len(segments) > HLS_CONFIG["max_segments"]:
+                    # Sort by modification time (oldest first)
+                    segments.sort(key=os.path.getmtime)
+                    
+                    # Remove excess segments
+                    segments_to_remove = segments[:-HLS_CONFIG["max_segments"]]
+                    for segment in segments_to_remove:
+                        try:
+                            os.remove(segment)
+                            print(f"Removed old segment: {os.path.basename(segment)}")
+                        except OSError as e:
+                            print(f"Error removing segment {segment}: {e}")
+                
+                time.sleep(HLS_CONFIG["cleanup_interval"])
+                
+            except Exception as e:
+                print(f"Error in cleanup worker for {channel_name}: {e}")
+                time.sleep(HLS_CONFIG["cleanup_interval"])
+    
+    # Start cleanup thread
+    cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+    cleanup_thread.start()
+    CLEANUP_THREADS[channel_name] = cleanup_thread
+    print(f"Started cleanup thread for '{channel_name}'")
+
 def stop_ffmpeg_process(channel_name: str):
-    """Stops the FFmpeg process for a given channel."""
+    """Stops the FFmpeg process and cleanup thread for a given channel."""
     if channel_name in FFMPEG_PROCESSES:
         process = FFMPEG_PROCESSES.pop(channel_name)
         process.terminate()
         print(f"Stopped FFmpeg process for '{channel_name}'.")
+    
+    # Stop cleanup thread by removing from tracking dict
+    if channel_name in CLEANUP_THREADS:
+        CLEANUP_THREADS.pop(channel_name)
+        print(f"Stopped cleanup thread for '{channel_name}'.")
 
 def start_ffmpeg_process(channel_name: str):
     """
-    Starts the FFmpeg process to transcode a live stream to HLS.
-    This function should run continuously in the background.
+    Starts the FFmpeg process to transcode a live stream to HLS with optimized settings
+    for low latency and automatic segment cleanup.
     """
     channel = get_channel_by_name(channel_name)
     if not channel:
@@ -125,24 +181,42 @@ def start_ffmpeg_process(channel_name: str):
     output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Construct the FFmpeg command
+    # Optimized FFmpeg command for low-latency HLS streaming
     ffmpeg_cmd = [
         "ffmpeg",
         "-i", channel["url"],
-        "-c:v", "copy",
-        "-c:a", "copy",
-        "-hls_time", "2",
-        "-hls_list_size", "5",
+        "-c:v", "copy",  # Copy video codec to avoid re-encoding
+        "-c:a", "copy",  # Copy audio codec to avoid re-encoding
+        "-hls_time", str(HLS_CONFIG["segment_duration"]),  # 2 seconds per segment
+        "-hls_list_size", str(HLS_CONFIG["max_segments"]),  # Keep only 5 segments
+        "-hls_flags", "delete_segments",  # Auto-delete old segments
+        "-hls_start_number_source", "datetime",  # Use datetime for segment naming
+        "-hls_segment_filename", os.path.join(output_dir, "segment_%Y%m%d_%H%M%S_%%03d.ts"),
         "-f", "hls",
+        "-loglevel", "warning",  # Reduce log verbosity
+        "-reconnect", "1",  # Auto-reconnect on connection loss
+        "-reconnect_streamed", "1",
+        "-reconnect_delay_max", "5",
         os.path.join(output_dir, "master.m3u8")
     ]
     
-    print(f"Starting FFmpeg process for '{channel_name}'...")
+    print(f"Starting optimized FFmpeg process for '{channel_name}'...")
     
     try:
         # Start the FFmpeg process and manage it in the global dictionary
-        process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        process = subprocess.Popen(
+            ffmpeg_cmd, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            universal_newlines=True
+        )
         FFMPEG_PROCESSES[channel_name] = process
+        
+        # Start the cleanup thread for this channel
+        cleanup_old_segments(channel_name)
+        
+        print(f"FFmpeg process and cleanup thread started for '{channel_name}'")
+        
     except FileNotFoundError:
         print("FFmpeg not found. Please ensure it is installed and in your system's PATH.")
     except Exception as e:
@@ -186,7 +260,102 @@ def start_stream_endpoint(channel_name: str):
     
     start_ffmpeg_process(channel_name)
     
-    return {"message": f"FFmpeg process for '{channel_name}' started."}
+    return {
+        "message": f"FFmpeg process for '{channel_name}' started.",
+        "channel": channel["name"],
+        "hls_url": f"/hls_streams/{channel_name}/master.m3u8",
+        "config": HLS_CONFIG
+    }
+
+@router.get("/stop-stream/{channel_name}")
+def stop_stream_endpoint(channel_name: str):
+    """
+    Stops the FFmpeg process for a specific channel.
+    """
+    channel = get_channel_by_name(channel_name)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    stop_ffmpeg_process(channel_name)
+    
+    return {"message": f"FFmpeg process for '{channel_name}' stopped."}
+
+@router.get("/stream-status/{channel_name}")
+def get_stream_status(channel_name: str):
+    """
+    Gets the status of a specific stream including segment count and process status.
+    """
+    channel = get_channel_by_name(channel_name)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
+    
+    # Check if FFmpeg process is running
+    is_running = channel_name in FFMPEG_PROCESSES
+    process_status = "running" if is_running else "stopped"
+    
+    # Check if cleanup thread is running
+    cleanup_running = channel_name in CLEANUP_THREADS
+    
+    # Count current segments
+    segment_count = 0
+    if os.path.exists(output_dir):
+        segments = glob.glob(os.path.join(output_dir, "*.ts"))
+        segment_count = len(segments)
+    
+    # Check if master.m3u8 exists
+    master_playlist_exists = os.path.exists(os.path.join(output_dir, "master.m3u8"))
+    
+    return {
+        "channel_name": channel["name"],
+        "stream_id": channel_name,
+        "process_status": process_status,
+        "cleanup_running": cleanup_running,
+        "segment_count": segment_count,
+        "max_segments": HLS_CONFIG["max_segments"],
+        "master_playlist_exists": master_playlist_exists,
+        "hls_url": f"/hls_streams/{channel_name}/master.m3u8" if master_playlist_exists else None,
+        "estimated_buffer_seconds": segment_count * HLS_CONFIG["segment_duration"]
+    }
+
+@router.get("/streams-status")
+def get_all_streams_status():
+    """
+    Gets the status of all configured streams.
+    """
+    statuses = []
+    for channel in static_channels:
+        channel_name = channel["re_stream_id"]
+        output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
+        
+        is_running = channel_name in FFMPEG_PROCESSES
+        cleanup_running = channel_name in CLEANUP_THREADS
+        
+        segment_count = 0
+        if os.path.exists(output_dir):
+            segments = glob.glob(os.path.join(output_dir, "*.ts"))
+            segment_count = len(segments)
+        
+        master_playlist_exists = os.path.exists(os.path.join(output_dir, "master.m3u8"))
+        
+        statuses.append({
+            "channel_name": channel["name"],
+            "stream_id": channel_name,
+            "process_status": "running" if is_running else "stopped",
+            "cleanup_running": cleanup_running,
+            "segment_count": segment_count,
+            "master_playlist_exists": master_playlist_exists,
+            "estimated_buffer_seconds": segment_count * HLS_CONFIG["segment_duration"]
+        })
+    
+    return {
+        "total_channels": len(static_channels),
+        "running_streams": len(FFMPEG_PROCESSES),
+        "active_cleanup_threads": len(CLEANUP_THREADS),
+        "hls_config": HLS_CONFIG,
+        "streams": statuses
+    }
 
 # The other endpoints for database-related operations and static playlist generation remain unchanged.
 # I've commented out the DB-related imports since they aren't used in this file's core logic.
