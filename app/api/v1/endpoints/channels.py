@@ -190,8 +190,7 @@ def start_ffmpeg_process(channel_name: str):
         "-hls_time", str(HLS_CONFIG["segment_duration"]),  # 2 seconds per segment
         "-hls_list_size", str(HLS_CONFIG["max_segments"]),  # Keep only 5 segments
         "-hls_flags", "delete_segments",  # Auto-delete old segments
-        "-hls_start_number_source", "datetime",  # Use datetime for segment naming
-        "-hls_segment_filename", os.path.join(output_dir, "segment_%Y%m%d_%H%M%S_%%03d.ts"),
+        "-hls_segment_filename", os.path.join(output_dir, "segment_%03d.ts"),  # Simple numeric pattern
         "-f", "hls",
         "-loglevel", "warning",  # Reduce log verbosity
         "-reconnect", "1",  # Auto-reconnect on connection loss
