@@ -203,10 +203,16 @@ def start_ffmpeg_process(channel_name: str):
     
     try:
         # Start the FFmpeg process and manage it in the global dictionary
+        # Create log file for this channel
+        log_file = os.path.join(output_dir, "ffmpeg.log")
+        with open(log_file, 'w') as log:
+            log.write(f"FFmpeg command: {' '.join(ffmpeg_cmd)}\n")
+            log.write(f"Started at: {datetime.now()}\n\n")
+        
         process = subprocess.Popen(
             ffmpeg_cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE,
+            stdout=open(log_file, 'a'), 
+            stderr=subprocess.STDOUT,
             universal_newlines=True
         )
         FFMPEG_PROCESSES[channel_name] = process
@@ -317,6 +323,38 @@ def get_stream_status(channel_name: str):
         "hls_url": f"/hls_streams/{channel_name}/master.m3u8" if master_playlist_exists else None,
         "estimated_buffer_seconds": segment_count * HLS_CONFIG["segment_duration"]
     }
+
+@router.get("/stream-logs/{channel_name}")
+def get_stream_logs(channel_name: str, lines: int = 50):
+    """
+    Gets the FFmpeg logs for a specific stream.
+    """
+    channel = get_channel_by_name(channel_name)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
+    log_file = os.path.join(output_dir, "ffmpeg.log")
+    
+    if not os.path.exists(log_file):
+        return {"error": "Log file not found", "channel_name": channel["name"]}
+    
+    try:
+        with open(log_file, 'r') as f:
+            log_lines = f.readlines()
+            # Get last N lines
+            recent_logs = log_lines[-lines:] if len(log_lines) > lines else log_lines
+            
+        return {
+            "channel_name": channel["name"],
+            "stream_id": channel_name,
+            "log_file": log_file,
+            "total_lines": len(log_lines),
+            "showing_lines": len(recent_logs),
+            "logs": ''.join(recent_logs)
+        }
+    except Exception as e:
+        return {"error": f"Failed to read log file: {str(e)}", "channel_name": channel["name"]}
 
 @router.get("/streams-status")
 def get_all_streams_status():
