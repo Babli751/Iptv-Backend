@@ -188,11 +188,12 @@ def start_ffmpeg_process(channel_name: str):
         "-c:v", "copy",  # Copy video codec to avoid re-encoding
         "-c:a", "copy",  # Copy audio codec to avoid re-encoding
         "-hls_time", str(HLS_CONFIG["segment_duration"]),  # 2 seconds per segment
-        "-hls_list_size", str(HLS_CONFIG["max_segments"]),  # Keep only 5 segments
-        "-hls_flags", "delete_segments",  # Auto-delete old segments
+        "-hls_list_size", str(HLS_CONFIG["max_segments"] + 2),  # Keep 7 segments (buffer)
+        "-hls_flags", "delete_segments+append_list",  # Auto-delete old segments and append to list
         "-hls_segment_filename", os.path.join(output_dir, "segment_%03d.ts"),  # Simple numeric pattern
+        "-hls_allow_cache", "0",  # Disable caching
         "-f", "hls",
-        "-loglevel", "warning",  # Reduce log verbosity
+        "-loglevel", "info",  # More detailed logging
         "-reconnect", "1",  # Auto-reconnect on connection loss
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
@@ -217,8 +218,8 @@ def start_ffmpeg_process(channel_name: str):
         )
         FFMPEG_PROCESSES[channel_name] = process
         
-        # Start the cleanup thread for this channel
-        cleanup_old_segments(channel_name)
+        # Note: FFmpeg handles cleanup with delete_segments flag
+        # No need for separate cleanup thread
         
         print(f"FFmpeg process and cleanup thread started for '{channel_name}'")
         
