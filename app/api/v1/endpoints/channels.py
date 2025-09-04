@@ -181,22 +181,26 @@ def start_ffmpeg_process(channel_name: str):
     output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Optimized FFmpeg command for low-latency HLS streaming
+    # Optimized FFmpeg command for continuous HLS streaming
     ffmpeg_cmd = [
         "ffmpeg",
+        "-re",  # Read input at native frame rate (important for live streaming)
+        "-stream_loop", "-1",  # Loop indefinitely if stream ends
         "-i", channel["url"],
         "-c:v", "copy",  # Copy video codec to avoid re-encoding
         "-c:a", "copy",  # Copy audio codec to avoid re-encoding
         "-hls_time", str(HLS_CONFIG["segment_duration"]),  # 2 seconds per segment
         "-hls_list_size", str(HLS_CONFIG["max_segments"] + 2),  # Keep 7 segments (buffer)
-        "-hls_flags", "delete_segments+append_list",  # Auto-delete old segments and append to list
+        "-hls_flags", "delete_segments+append_list+round_durations",  # Better segment handling
         "-hls_segment_filename", os.path.join(output_dir, "segment_%03d.ts"),  # Simple numeric pattern
         "-hls_allow_cache", "0",  # Disable caching
         "-f", "hls",
-        "-loglevel", "info",  # More detailed logging
+        "-loglevel", "warning",  # Reduce log verbosity
         "-reconnect", "1",  # Auto-reconnect on connection loss
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
+        "-reconnect_at_eof", "1",  # Reconnect at end of file
+        "-max_reload", "3600",  # Max playlist reloads per hour
         os.path.join(output_dir, "master.m3u8")
     ]
     
@@ -246,13 +250,52 @@ def get_static_hls_playlist():
     server_base_url = "http://5.63.19.76:8000"
     
     for channel in static_channels:
-        # The URL now points to the correct StaticFiles mount point
-        hls_url = f"{server_base_url}/hls_streams/{quote(channel['re_stream_id'])}/master.m3u8"
+        # Use the auto-start HLS endpoint that will start streams on demand
+        hls_url = f"{server_base_url}/api/v1/channels/hls/{quote(channel['re_stream_id'])}/master.m3u8"
         m3u_content += f'#EXTINF:-1 tvg-id="{channel["re_stream_id"]}" tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
         m3u_content += f'{hls_url}\n'
         
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
 
+
+@router.get("/hls/{channel_name}/master.m3u8")
+def auto_start_hls_stream(channel_name: str):
+    """
+    Auto-starts a stream when the HLS URL is accessed directly.
+    This allows streams to start automatically when someone opens the HLS link.
+    """
+    from fastapi.responses import FileResponse, RedirectResponse
+    import os
+    
+    channel = get_channel_by_name(channel_name)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    # Check if stream is already running
+    if channel_name not in FFMPEG_PROCESSES:
+        print(f"Auto-starting stream for '{channel_name}' due to HLS request")
+        start_ffmpeg_process(channel_name)
+        
+        # Wait a moment for initial segments to be created
+        import time
+        time.sleep(3)
+    
+    # Check if master.m3u8 exists
+    output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
+    master_file = os.path.join(output_dir, "master.m3u8")
+    
+    if os.path.exists(master_file):
+        return FileResponse(
+            master_file,
+            media_type="application/x-mpegurl",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+    else:
+        raise HTTPException(status_code=503, detail="Stream not ready yet, please try again in a few seconds")
 
 @router.get("/start-stream/{channel_name}")
 def start_stream_endpoint(channel_name: str):
@@ -356,6 +399,32 @@ def get_stream_logs(channel_name: str, lines: int = 50):
         }
     except Exception as e:
         return {"error": f"Failed to read log file: {str(e)}", "channel_name": channel["name"]}
+
+@router.get("/restart-all-streams")
+def restart_all_streams():
+    """
+    Restart all currently running streams with improved settings.
+    """
+    restarted = []
+    failed = []
+    
+    for channel in static_channels:
+        channel_name = channel["re_stream_id"]
+        try:
+            if channel_name in FFMPEG_PROCESSES:
+                stop_ffmpeg_process(channel_name)
+                start_ffmpeg_process(channel_name)
+                restarted.append(channel["name"])
+        except Exception as e:
+            failed.append({"channel": channel["name"], "error": str(e)})
+    
+    return {
+        "message": "Stream restart completed",
+        "restarted_count": len(restarted),
+        "restarted_channels": restarted,
+        "failed_count": len(failed),
+        "failed_channels": failed
+    }
 
 @router.get("/streams-status")
 def get_all_streams_status():
