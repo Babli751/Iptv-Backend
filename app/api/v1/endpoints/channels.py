@@ -308,13 +308,14 @@ http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7d
 def get_static_original_playlist():
     """
     Generates an M3U playlist with the original stream URLs.
-    This is the simplest possible solution - direct links to source streams.
+    FIXED: Simplified format like the working test playlist.
     """
     m3u_content = "#EXTM3U\n"
     
     for channel in static_channels:
-        # Use the original URLs directly - no processing at all
-        m3u_content += f'#EXTINF:-1 tvg-id="{channel["re_stream_id"]}" tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
+        # Simple format that works - just like our successful test
+        clean_name = channel["name"].replace("&", "and").replace('"', "'")
+        m3u_content += f'#EXTINF:-1,{clean_name}\n'
         m3u_content += f'{channel["url"]}\n'
         
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
@@ -340,7 +341,7 @@ def get_static_direct_playlist():
 def get_static_hls_playlist():
     """
     Generates an M3U playlist with HLS links pointing to the re-streamed content.
-    This endpoint now correctly points to the static file location.
+    FIXED: Simplified format like the working test playlist.
     """
     m3u_content = "#EXTM3U\n"
     server_base_url = "http://5.63.19.76:8000"
@@ -348,7 +349,8 @@ def get_static_hls_playlist():
     for channel in static_channels:
         # Use the auto-start HLS endpoint that will start streams on demand
         hls_url = f"{server_base_url}/api/v1/channels/hls/{quote(channel['re_stream_id'])}/master.m3u8"
-        m3u_content += f'#EXTINF:-1 tvg-id="{channel["re_stream_id"]}" tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
+        clean_name = channel["name"].replace("&", "and").replace('"', "'")
+        m3u_content += f'#EXTINF:-1,{clean_name}\n'
         m3u_content += f'{hls_url}\n'
         
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
