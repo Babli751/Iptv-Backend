@@ -99,11 +99,15 @@ FFMPEG_PROCESSES = {}
 # Dictionary to keep track of cleanup threads
 CLEANUP_THREADS = {}
 
+# Dictionary to keep track of monitoring threads
+MONITOR_THREADS = {}
+
 # Configuration for HLS streaming
 HLS_CONFIG = {
     "segment_duration": 2,  # 2 seconds per segment
     "max_segments": 5,      # Keep only 5 segments (10 seconds total)
     "cleanup_interval": 5,  # Clean up every 5 seconds
+    "monitor_interval": 30, # Monitor streams every 30 seconds
 }
 
 def get_channel_by_name(channel_name: str):
@@ -153,6 +157,48 @@ def cleanup_old_segments(channel_name: str):
     CLEANUP_THREADS[channel_name] = cleanup_thread
     print(f"Started cleanup thread for '{channel_name}'")
 
+def monitor_stream_health(channel_name: str):
+    """
+    Monitor stream health and restart if the process dies or segments stop updating.
+    """
+    def monitor_worker():
+        while channel_name in FFMPEG_PROCESSES:
+            try:
+                process = FFMPEG_PROCESSES.get(channel_name)
+                if process and process.poll() is not None:
+                    # Process has died, restart it
+                    print(f"Stream '{channel_name}' process died, restarting...")
+                    FFMPEG_PROCESSES.pop(channel_name, None)
+                    start_ffmpeg_process(channel_name)
+                    break
+                
+                # Check if segments are being updated
+                output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
+                master_file = os.path.join(output_dir, "master.m3u8")
+                
+                if os.path.exists(master_file):
+                    # Check if master.m3u8 was modified recently
+                    mod_time = os.path.getmtime(master_file)
+                    current_time = time.time()
+                    
+                    if current_time - mod_time > HLS_CONFIG["monitor_interval"] * 2:
+                        print(f"Stream '{channel_name}' appears stale, restarting...")
+                        stop_ffmpeg_process(channel_name)
+                        start_ffmpeg_process(channel_name)
+                        break
+                
+                time.sleep(HLS_CONFIG["monitor_interval"])
+                
+            except Exception as e:
+                print(f"Error monitoring stream '{channel_name}': {e}")
+                time.sleep(HLS_CONFIG["monitor_interval"])
+    
+    # Start monitoring thread
+    monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
+    monitor_thread.start()
+    MONITOR_THREADS[channel_name] = monitor_thread
+    print(f"Started monitoring thread for '{channel_name}'")
+
 def stop_ffmpeg_process(channel_name: str):
     """Stops the FFmpeg process and cleanup thread for a given channel."""
     if channel_name in FFMPEG_PROCESSES:
@@ -164,6 +210,11 @@ def stop_ffmpeg_process(channel_name: str):
     if channel_name in CLEANUP_THREADS:
         CLEANUP_THREADS.pop(channel_name)
         print(f"Stopped cleanup thread for '{channel_name}'.")
+    
+    # Stop monitor thread
+    if channel_name in MONITOR_THREADS:
+        MONITOR_THREADS.pop(channel_name)
+        print(f"Stopped monitor thread for '{channel_name}'.")
 
 def start_ffmpeg_process(channel_name: str):
     """
@@ -222,10 +273,10 @@ def start_ffmpeg_process(channel_name: str):
         )
         FFMPEG_PROCESSES[channel_name] = process
         
-        # Note: FFmpeg handles cleanup with delete_segments flag
-        # No need for separate cleanup thread
+        # Start stream monitoring for automatic restart
+        monitor_stream_health(channel_name)
         
-        print(f"FFmpeg process and cleanup thread started for '{channel_name}'")
+        print(f"FFmpeg process and monitoring started for '{channel_name}'")
         
     except FileNotFoundError:
         print("FFmpeg not found. Please ensure it is installed and in your system's PATH.")
