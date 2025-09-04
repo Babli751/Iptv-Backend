@@ -169,6 +169,8 @@ def monitor_stream_health(channel_name: str):
                     # Process has died, restart it
                     print(f"Stream '{channel_name}' process died, restarting...")
                     FFMPEG_PROCESSES.pop(channel_name, None)
+                    # Wait a moment before restarting to avoid rapid restarts
+                    time.sleep(5)
                     start_ffmpeg_process(channel_name)
                     break
                 
@@ -225,6 +227,13 @@ def start_ffmpeg_process(channel_name: str):
     if not channel:
         return
 
+    # Check if process is already running and valid
+    if channel_name in FFMPEG_PROCESSES:
+        existing_process = FFMPEG_PROCESSES[channel_name]
+        if existing_process.poll() is None:  # Process is still running
+            print(f"FFmpeg process for '{channel_name}' is already running")
+            return
+    
     # Stop any existing process for this channel
     stop_ffmpeg_process(channel_name)
 
@@ -450,6 +459,27 @@ def get_stream_logs(channel_name: str, lines: int = 50):
         }
     except Exception as e:
         return {"error": f"Failed to read log file: {str(e)}", "channel_name": channel["name"]}
+
+@router.get("/cleanup-processes")
+def cleanup_processes():
+    """
+    Clean up orphaned process tracking and reset the system.
+    """
+    cleaned_processes = []
+    
+    # Check each tracked process
+    for channel_name, process in list(FFMPEG_PROCESSES.items()):
+        if process.poll() is not None:  # Process is dead
+            cleaned_processes.append(channel_name)
+            FFMPEG_PROCESSES.pop(channel_name)
+            MONITOR_THREADS.pop(channel_name, None)
+            CLEANUP_THREADS.pop(channel_name, None)
+    
+    return {
+        "message": "Process cleanup completed",
+        "cleaned_processes": cleaned_processes,
+        "remaining_processes": len(FFMPEG_PROCESSES)
+    }
 
 @router.get("/restart-all-streams")
 def restart_all_streams():
