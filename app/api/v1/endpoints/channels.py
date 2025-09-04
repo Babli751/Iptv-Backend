@@ -353,20 +353,25 @@ http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7d
 def get_static_original_playlist():
     """
     Generates an M3U playlist with the original stream URLs.
-    FIXED: Simplified format like the working test playlist.
+    FIXED: Proper line breaks and encoding for VLC compatibility.
     """
-    m3u_content = "#EXTM3U\n"
+    # Build the M3U content with explicit line breaks
+    lines = ["#EXTM3U"]
     
     for channel in static_channels:
         # Simple format that works - just like our successful test
         clean_name = channel["name"].replace("&", "and").replace('"', "'")
-        m3u_content += f'#EXTINF:-1,{clean_name}\n'
-        m3u_content += f'{channel["url"]}\n'
+        lines.append(f"#EXTINF:-1,{clean_name}")
+        lines.append(channel["url"])
+    
+    # Join with proper line breaks
+    m3u_content = "\n".join(lines) + "\n"
     
     headers = {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Content-Type": "audio/x-mpegurl; charset=utf-8"
     }
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
@@ -407,22 +412,31 @@ def get_static_direct_playlist():
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
 
 @router.get("/static-hls-m3u")
+@router.head("/static-hls-m3u")
 def get_static_hls_playlist():
     """
     Generates an M3U playlist with HLS links pointing to the re-streamed content.
-    FIXED: Simplified format like the working test playlist.
+    FIXED: Proper line breaks and HEAD method support.
     """
-    m3u_content = "#EXTM3U\n"
+    lines = ["#EXTM3U"]
     server_base_url = "http://5.63.19.76:8000"
     
     for channel in static_channels:
         # Use the auto-start HLS endpoint that will start streams on demand
         hls_url = f"{server_base_url}/api/v1/channels/hls/{quote(channel['re_stream_id'])}/master.m3u8"
         clean_name = channel["name"].replace("&", "and").replace('"', "'")
-        m3u_content += f'#EXTINF:-1,{clean_name}\n'
-        m3u_content += f'{hls_url}\n'
-        
-    return Response(content=m3u_content, media_type="audio/x-mpegurl")
+        lines.append(f"#EXTINF:-1,{clean_name}")
+        lines.append(hls_url)
+    
+    m3u_content = "\n".join(lines) + "\n"
+    
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Content-Type": "audio/x-mpegurl; charset=utf-8"
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 
 @router.get("/proxy/{channel_name}")
