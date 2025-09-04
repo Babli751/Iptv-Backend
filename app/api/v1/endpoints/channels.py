@@ -256,9 +256,8 @@ def start_ffmpeg_process(channel_name: str):
         "-f", "hls",
         "-loglevel", "info",  # More detailed logging for debugging
         "-reconnect", "1",  # Auto-reconnect on connection loss
-        "-reconnect_streamed", "1",
+        "-reconnect_streamed", "1", 
         "-reconnect_delay_max", "5",
-        "-timeout", "10000000",  # 10 second timeout
         os.path.join(output_dir, "master.m3u8")
     ]
     
