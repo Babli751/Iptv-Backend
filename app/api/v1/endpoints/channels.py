@@ -292,6 +292,7 @@ def shutdown_event():
         stop_ffmpeg_process(channel_name)
 
 @router.get("/test-simple-m3u")
+@router.head("/test-simple-m3u")
 def get_test_simple_playlist():
     """
     Ultra-simple M3U for testing - just one working stream with minimal metadata.
@@ -314,6 +315,7 @@ http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7d
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 @router.get("/test-single-stream")
+@router.head("/test-single-stream")
 def get_single_stream_test():
     """
     Test with just ONE stream - the BigBuckBunny video that we know works.
@@ -330,6 +332,7 @@ http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 @router.get("/test-single-hls")
+@router.head("/test-single-hls")
 def get_single_hls_test():
     """
     Test with just ONE HLS stream - the 7x Music that we know is accessible.
@@ -346,6 +349,7 @@ http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7d
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 @router.get("/static-original-m3u")
+@router.head("/static-original-m3u")
 def get_static_original_playlist():
     """
     Generates an M3U playlist with the original stream URLs.
@@ -367,6 +371,7 @@ def get_static_original_playlist():
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 @router.get("/test-vlc-format")
+@router.head("/test-vlc-format")
 def get_vlc_compatible_format():
     """
     Test M3U with different content type and format specifically for VLC.
