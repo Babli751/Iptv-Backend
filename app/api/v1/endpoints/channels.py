@@ -434,6 +434,32 @@ def get_vlc_debug_playlist():
     }
     return Response(content=m3u_content, media_type="application/vnd.apple.mpegurl", headers=headers)
 
+@router.get("/fresh-playlist-test")
+@router.head("/fresh-playlist-test")
+def get_fresh_playlist_test():
+    """
+    Brand new endpoint to bypass any caching issues.
+    """
+    lines = ["#EXTM3U"]
+    
+    for channel in static_channels[:3]:  # Just first 3 channels for testing
+        clean_name = channel["name"].replace("&", "and").replace('"', "'")
+        lines.append(f"#EXTINF:-1,{clean_name}")
+        lines.append(channel["url"])
+    
+    m3u_content = "\n".join(lines) + "\n"
+    
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "-1",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Content-Type": "audio/x-mpegurl; charset=utf-8",
+        "X-Fresh-Response": f"Generated-{int(__import__('time').time())}"
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
+
 @router.get("/static-direct-m3u")
 def get_static_direct_playlist():
     """
