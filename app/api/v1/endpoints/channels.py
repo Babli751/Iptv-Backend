@@ -291,6 +291,23 @@ def shutdown_event():
     for channel_name in list(FFMPEG_PROCESSES.keys()):
         stop_ffmpeg_process(channel_name)
 
+@router.get("/static-direct-m3u")
+def get_static_direct_playlist():
+    """
+    Generates an M3U playlist with direct links to original streams.
+    This bypasses all processing and should work immediately.
+    """
+    m3u_content = "#EXTM3U\n"
+    server_base_url = "http://5.63.19.76:8000"
+    
+    for channel in static_channels:
+        # Use direct proxy URLs that redirect to original streams
+        proxy_url = f"{server_base_url}/api/v1/channels/proxy/{quote(channel['re_stream_id'])}"
+        m3u_content += f'#EXTINF:-1 tvg-id="{channel["re_stream_id"]}" tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
+        m3u_content += f'{proxy_url}\n'
+        
+    return Response(content=m3u_content, media_type="audio/x-mpegurl")
+
 @router.get("/static-hls-m3u")
 def get_static_hls_playlist():
     """
@@ -308,6 +325,21 @@ def get_static_hls_playlist():
         
     return Response(content=m3u_content, media_type="audio/x-mpegurl")
 
+
+@router.get("/proxy/{channel_name}")
+def proxy_stream(channel_name: str):
+    """
+    Direct proxy to the original stream - bypasses HLS conversion completely.
+    This should work immediately without any processing.
+    """
+    from fastapi.responses import RedirectResponse
+    
+    channel = get_channel_by_name(channel_name)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    # Direct redirect to the original stream
+    return RedirectResponse(url=channel["url"])
 
 @router.get("/hls/{channel_name}/master.m3u8")
 def auto_start_hls_stream(channel_name: str):
