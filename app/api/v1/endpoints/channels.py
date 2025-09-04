@@ -295,6 +295,7 @@ def shutdown_event():
 def get_test_simple_playlist():
     """
     Ultra-simple M3U for testing - just one working stream with minimal metadata.
+    Enhanced with proper CORS headers for VLC compatibility.
     """
     m3u_content = """#EXTM3U
 #EXTINF:-1,Test Stream
@@ -302,7 +303,47 @@ http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp
 #EXTINF:-1,7x Music
 http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb
 """
-    return Response(content=m3u_content, media_type="audio/x-mpegurl")
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*"
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
+
+@router.get("/test-single-stream")
+def get_single_stream_test():
+    """
+    Test with just ONE stream - the BigBuckBunny video that we know works.
+    """
+    m3u_content = """#EXTM3U
+#EXTINF:-1,Big Buck Bunny
+http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+"""
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
+
+@router.get("/test-single-hls")
+def get_single_hls_test():
+    """
+    Test with just ONE HLS stream - the 7x Music that we know is accessible.
+    """
+    m3u_content = """#EXTM3U
+#EXTINF:-1,7x Music HLS
+http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb
+"""
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 @router.get("/static-original-m3u")
 def get_static_original_playlist():
@@ -317,8 +358,13 @@ def get_static_original_playlist():
         clean_name = channel["name"].replace("&", "and").replace('"', "'")
         m3u_content += f'#EXTINF:-1,{clean_name}\n'
         m3u_content += f'{channel["url"]}\n'
-        
-    return Response(content=m3u_content, media_type="audio/x-mpegurl")
+    
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
 @router.get("/static-direct-m3u")
 def get_static_direct_playlist():
