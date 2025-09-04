@@ -291,6 +291,21 @@ def shutdown_event():
     for channel_name in list(FFMPEG_PROCESSES.keys()):
         stop_ffmpeg_process(channel_name)
 
+@router.get("/static-original-m3u")
+def get_static_original_playlist():
+    """
+    Generates an M3U playlist with the original stream URLs.
+    This is the simplest possible solution - direct links to source streams.
+    """
+    m3u_content = "#EXTM3U\n"
+    
+    for channel in static_channels:
+        # Use the original URLs directly - no processing at all
+        m3u_content += f'#EXTINF:-1 tvg-id="{channel["re_stream_id"]}" tvg-name="{channel["name"]}" tvg-logo="{channel["logo"]}" group-title="{channel["group"]}",{channel["name"]}\n'
+        m3u_content += f'{channel["url"]}\n'
+        
+    return Response(content=m3u_content, media_type="audio/x-mpegurl")
+
 @router.get("/static-direct-m3u")
 def get_static_direct_playlist():
     """
