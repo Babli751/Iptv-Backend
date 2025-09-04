@@ -104,10 +104,10 @@ MONITOR_THREADS = {}
 
 # Configuration for HLS streaming
 HLS_CONFIG = {
-    "segment_duration": 2,  # 2 seconds per segment
-    "max_segments": 5,      # Keep only 5 segments (10 seconds total)
-    "cleanup_interval": 5,  # Clean up every 5 seconds
-    "monitor_interval": 30, # Monitor streams every 30 seconds
+    "segment_duration": 6,  # 6 seconds per segment
+    "max_segments": 6,      # Keep 6 segments (36 seconds total)
+    "cleanup_interval": 30, # Clean up every 30 seconds
+    "monitor_interval": 60, # Monitor streams every 60 seconds
 }
 
 def get_channel_by_name(channel_name: str):
@@ -235,8 +235,8 @@ def start_ffmpeg_process(channel_name: str):
         existing_process = FFMPEG_PROCESSES[channel_name]
         if existing_process.poll() is None:  # Process is still running
             print(f"FFmpeg process for '{channel_name}' is already running")
-            return
-    
+        return
+
     # Stop any existing process for this channel
     stop_ffmpeg_process(channel_name)
 
@@ -244,23 +244,17 @@ def start_ffmpeg_process(channel_name: str):
     output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Optimized FFmpeg command for continuous HLS streaming
+    # Simple and reliable FFmpeg command for HLS streaming
     ffmpeg_cmd = [
         "ffmpeg",
-        "-fflags", "+genpts",  # Generate presentation timestamps
         "-i", channel["url"],
-        "-c:v", "copy",  # Copy video codec to avoid re-encoding
-        "-c:a", "copy",  # Copy audio codec to avoid re-encoding
-        "-hls_time", str(HLS_CONFIG["segment_duration"]),  # 2 seconds per segment
-        "-hls_list_size", str(HLS_CONFIG["max_segments"] + 2),  # Keep 7 segments (buffer)
-        "-hls_flags", "append_list",  # Don't auto-delete segments to avoid race conditions
-        "-hls_segment_filename", os.path.join(output_dir, "segment_%03d.ts"),  # Simple numeric pattern
-        "-hls_allow_cache", "0",  # Disable caching
+        "-c", "copy",  # Copy both video and audio
+        "-hls_time", "6",  # Longer segments for better reliability
+        "-hls_list_size", "6",  # Keep more segments
+        "-hls_segment_filename", os.path.join(output_dir, "segment_%d.ts"),
+        "-hls_playlist_type", "event",  # Event playlist type
         "-f", "hls",
-        "-loglevel", "info",  # More detailed logging for debugging
-        "-reconnect", "1",  # Auto-reconnect on connection loss
-        "-reconnect_streamed", "1", 
-        "-reconnect_delay_max", "5",
+        "-y",  # Overwrite output files
         os.path.join(output_dir, "master.m3u8")
     ]
     
@@ -282,13 +276,7 @@ def start_ffmpeg_process(channel_name: str):
         )
         FFMPEG_PROCESSES[channel_name] = process
         
-        # Start the cleanup thread for this channel (more controlled than FFmpeg auto-delete)
-        cleanup_old_segments(channel_name)
-        
-        # Start stream monitoring for automatic restart
-        monitor_stream_health(channel_name)
-        
-        print(f"FFmpeg process, cleanup, and monitoring started for '{channel_name}'")
+        print(f"FFmpeg process started for '{channel_name}'")
         
     except FileNotFoundError:
         print("FFmpeg not found. Please ensure it is installed and in your system's PATH.")
