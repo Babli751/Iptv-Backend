@@ -368,10 +368,14 @@ def get_static_original_playlist():
     m3u_content = "\n".join(lines) + "\n"
     
     headers = {
-        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache", 
+        "Expires": "-1",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Content-Type": "audio/x-mpegurl; charset=utf-8"
+        "Content-Type": "audio/x-mpegurl; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "X-Timestamp": str(int(__import__('time').time()))
     }
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
