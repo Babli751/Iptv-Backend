@@ -366,6 +366,24 @@ def get_static_original_playlist():
     }
     return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
 
+@router.get("/test-vlc-format")
+def get_vlc_compatible_format():
+    """
+    Test M3U with different content type and format specifically for VLC.
+    """
+    m3u_content = """#EXTM3U
+#EXTINF:-1,Big Buck Bunny
+http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+#EXTINF:-1,7x Music
+http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb
+"""
+    headers = {
+        "Content-Type": "application/x-mpegurl",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+    }
+    return Response(content=m3u_content, media_type="application/x-mpegurl", headers=headers)
+
 @router.get("/static-direct-m3u")
 def get_static_direct_playlist():
     """
