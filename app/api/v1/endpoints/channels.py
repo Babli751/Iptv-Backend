@@ -132,16 +132,19 @@ def cleanup_old_segments(channel_name: str):
                 segment_pattern = os.path.join(output_dir, "*.ts")
                 segments = glob.glob(segment_pattern)
                 
-                if len(segments) > HLS_CONFIG["max_segments"]:
+                if len(segments) > HLS_CONFIG["max_segments"] + 3:  # Keep extra buffer
                     # Sort by modification time (oldest first)
                     segments.sort(key=os.path.getmtime)
                     
-                    # Remove excess segments
-                    segments_to_remove = segments[:-HLS_CONFIG["max_segments"]]
+                    # Remove excess segments, but keep more than the playlist needs
+                    segments_to_remove = segments[:-(HLS_CONFIG["max_segments"] + 2)]
                     for segment in segments_to_remove:
                         try:
-                            os.remove(segment)
-                            print(f"Removed old segment: {os.path.basename(segment)}")
+                            # Only remove segments older than 30 seconds to avoid race conditions
+                            segment_age = time.time() - os.path.getmtime(segment)
+                            if segment_age > 30:
+                                os.remove(segment)
+                                print(f"Removed old segment: {os.path.basename(segment)}")
                         except OSError as e:
                             print(f"Error removing segment {segment}: {e}")
                 
@@ -250,7 +253,7 @@ def start_ffmpeg_process(channel_name: str):
         "-c:a", "copy",  # Copy audio codec to avoid re-encoding
         "-hls_time", str(HLS_CONFIG["segment_duration"]),  # 2 seconds per segment
         "-hls_list_size", str(HLS_CONFIG["max_segments"] + 2),  # Keep 7 segments (buffer)
-        "-hls_flags", "delete_segments+append_list",  # Better segment handling
+        "-hls_flags", "append_list",  # Don't auto-delete segments to avoid race conditions
         "-hls_segment_filename", os.path.join(output_dir, "segment_%03d.ts"),  # Simple numeric pattern
         "-hls_allow_cache", "0",  # Disable caching
         "-f", "hls",
@@ -279,10 +282,13 @@ def start_ffmpeg_process(channel_name: str):
         )
         FFMPEG_PROCESSES[channel_name] = process
         
+        # Start the cleanup thread for this channel (more controlled than FFmpeg auto-delete)
+        cleanup_old_segments(channel_name)
+        
         # Start stream monitoring for automatic restart
         monitor_stream_health(channel_name)
         
-        print(f"FFmpeg process and monitoring started for '{channel_name}'")
+        print(f"FFmpeg process, cleanup, and monitoring started for '{channel_name}'")
         
     except FileNotFoundError:
         print("FFmpeg not found. Please ensure it is installed and in your system's PATH.")
