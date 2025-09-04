@@ -394,6 +394,46 @@ http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7d
     }
     return Response(content=m3u_content, media_type="application/x-mpegurl", headers=headers)
 
+@router.get("/test-minimal")
+@router.head("/test-minimal")
+def get_minimal_test():
+    """
+    Absolute minimal test - just BigBuckBunny MP4 that definitely works.
+    """
+    m3u_content = "#EXTM3U\n#EXTINF:-1,Big Buck Bunny\nhttp://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\n"
+    
+    headers = {
+        "Content-Type": "audio/x-mpegurl",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+    }
+    return Response(content=m3u_content, media_type="audio/x-mpegurl", headers=headers)
+
+@router.get("/test-vlc-debug")
+@router.head("/test-vlc-debug")
+def get_vlc_debug_playlist():
+    """
+    Debug playlist with proper M3U8 extension and UTF-8 encoding for VLC compatibility.
+    Based on VLC compatibility research.
+    """
+    m3u_content = "#EXTM3U\n"
+    m3u_content += "#EXTINF:-1,Big Buck Bunny Test\n"
+    m3u_content += "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\n"
+    m3u_content += "#EXTINF:-1,7x Music Stream\n" 
+    m3u_content += "http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb\n"
+    
+    headers = {
+        "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",  # M3U8 specific content type
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Content-Disposition": "inline; filename=playlist.m3u8"  # Suggest .m3u8 extension
+    }
+    return Response(content=m3u_content, media_type="application/vnd.apple.mpegurl", headers=headers)
+
 @router.get("/static-direct-m3u")
 def get_static_direct_playlist():
     """
