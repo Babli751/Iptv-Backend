@@ -341,8 +341,11 @@ def auto_start_hls_stream(channel_name: str):
             media_type="application/x-mpegurl",
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
+                "Pragma": "no-cache", 
+                "Expires": "0",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*"
             }
         )
     else:
