@@ -244,15 +244,18 @@ def start_ffmpeg_process(channel_name: str):
     output_dir = os.path.join(HLS_OUTPUT_DIR, channel_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Simple and reliable FFmpeg command for HLS streaming
+    # Fixed FFmpeg command for HLS live streaming with automatic segment cleanup
     ffmpeg_cmd = [
         "ffmpeg",
         "-i", channel["url"],
         "-c", "copy",  # Copy both video and audio
-        "-hls_time", "6",  # Longer segments for better reliability
-        "-hls_list_size", "6",  # Keep more segments
-        "-hls_segment_filename", os.path.join(output_dir, "segment_%d.ts"),
-        "-hls_playlist_type", "event",  # Event playlist type
+        "-hls_time", "2",  # 2 second segments for better live streaming
+        "-hls_list_size", "5",  # Keep only last 5 segments (10 seconds total)
+        "-hls_flags", "delete_segments+append_list",  # Auto-delete old segments
+        "-hls_delete_threshold", "1",  # Delete segments immediately after they're old
+        "-hls_segment_filename", os.path.join(output_dir, "segment_%05d.ts"),
+        "-hls_segment_type", "mpegts",
+        "-start_number", "0",
         "-f", "hls",
         "-y",  # Overwrite output files
         os.path.join(output_dir, "master.m3u8")
