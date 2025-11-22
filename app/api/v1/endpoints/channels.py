@@ -21,70 +21,77 @@ from urllib.parse import quote
 
 router = APIRouter()
 
-# A list of static channels with unique stream IDs
+# A list of static channels with unique stream IDs - Updated with working credentials
 static_channels = [
     {
-        "name": "&pictures",
-        "url": "http://51.254.122.232:5005/stream/tata/pictures/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "and_pictures",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "TEST - Big Buck Bunny",
+        "url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        "re_stream_id": "test_bigbuckbunny",
+        "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/220px-Big_buck_bunny_poster_big.jpg",
+        "group": "TEST"
     },
     {
-        "name": "7x Music",
-        "url": "http://51.254.122.232:5005/stream/tata/7xmusic/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "7x_music",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "BBC NEWS",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/73",
+        "re_stream_id": "bbc_news",
+        "logo": "https://ottsolutions.club:443/images/tcjBMuCD8M_zcpZuORRWzTeXJV4oMdcef4K7bEaOcgI7HaUo30HHTMTpGcxRijX7uWugMRhFxcP1fNU96aTPOc0EAesHufB8cC2gUoP-L46KjkQJcvjlFzLhgpWlUEVfQ1l8gA6KbO65duFyL__moA.png",
+        "group": "INTERNATIONAL NEWS"
     },
     {
-        "name": "&TV",
-        "url": "http://51.254.122.232:5005/stream/tata/tv/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "and_tv",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "CNN NEWS",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/74",
+        "re_stream_id": "cnn_news",
+        "logo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZ0kUCLQEYxZ5E6EHKdautdgsN97HRDZnedrlQndqxig&s",
+        "group": "INTERNATIONAL NEWS"
     },
     {
-        "name": "Animal Planet HD World",
-        "url": "http://51.254.122.232:5005/stream/tata/animalplanethdworld/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "animal_planet",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "ARY QTV",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/7",
+        "re_stream_id": "ary_qtv",
+        "logo": "http://b1gchlogos.xyz/wp-content/uploads/2023/09/ARY-QTV.png",
+        "group": "ISLAMIC"
     },
     {
-        "name": "Jantantra TV",
-        "url": "http://51.254.122.232:5005/stream/tata/jantantratv/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "jantantra_tv",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "Peace TV Urdu HD",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/8",
+        "re_stream_id": "peace_tv_urdu",
+        "logo": "https://b1gchlogos.xyz/wp-content/uploads/2023/09/Peace-TV.png",
+        "group": "ISLAMIC"
     },
     {
-        "name": "Jaya Max",
-        "url": "http://51.254.122.232:5005/stream/tata/jayamax/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "jaya_max",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "Peace TV English HD",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/9",
+        "re_stream_id": "peace_tv_english",
+        "logo": "http://b1gchlogos.xyz/wp-content/uploads/2023/09/Peace-TV.png",
+        "group": "ISLAMIC"
     },
     {
-        "name": "Bollywood Premiere",
-        "url": "http://51.254.122.232:5005/stream/tata/tataplaybollywoodpremiere/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "bollywood_premiere",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "Cartoon Network HD",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/82",
+        "re_stream_id": "cartoon_network",
+        "logo": "http://b1g.fun/logos2/cartoon_network.jpg",
+        "group": "IN | PK | KIDS"
     },
     {
-        "name": "Al Jazeera",
-        "url": "http://51.254.122.232:5005/stream/tata/aljazeera/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "al_jazeera",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "Kids Zone+ HD",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/84",
+        "re_stream_id": "kids_zone",
+        "logo": "http://b1g.fun/logos2/kids_zone.jpg",
+        "group": "IN | PK | KIDS"
     },
     {
-        "name": "ANN News",
-        "url": "http://51.254.122.232:5005/stream/tata/annnews/master.m3u8?u=atech&p=1491fed6b7de88547a8fd33cdb98e457a54e142527b1b59f6c0502a8a87fb6bb",
-        "re_stream_id": "ann_news",
-        "logo": "https://99designs-blog.imgix.net/blog/wp-content/uploads/2022/06/attachment_135299869.jpeg",
-        "group": "News"
+        "name": "8XM MUSIC HD",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/185",
+        "re_stream_id": "8xm_music",
+        "logo": "https://ottsolutions.club:443/images/UXtkyGhDugBYWGJv-P51osDDA_GvRfWm19gSBVwU4juKnWXkbB2FiJsEvSHWx670.png",
+        "group": "MUSIC VIP"
+    },
+    {
+        "name": "Motu Patlu",
+        "url": "https://rolextv.one:443/arsalan/@arsalan/284843",
+        "re_stream_id": "motu_patlu",
+        "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/3/3b/Motu_Patlu.Jpg/250px-Motu_Patlu.Jpg",
+        "group": "PLAYMAX CARTOONS"
     }
 ]
 
